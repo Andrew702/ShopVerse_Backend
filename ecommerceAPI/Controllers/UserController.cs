@@ -4,6 +4,7 @@ using ecommerceAPI.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace ecommerceAPI.Controllers
 {
@@ -39,11 +40,36 @@ namespace ecommerceAPI.Controllers
         }
 
 
-        //[HttpGet]
-        //public IActionResult Login(LoginDTO loginDTO)
-        //{
+        [HttpPost("login")]
+        public async Task<IActionResult> Login(LoginDTO loginDTO)
+        {
+            var user =await userManager.FindByEmailAsync(loginDTO.Email);
+            if (user==null)
+            {
+                return NotFound("email or password is incorrect");
+            }
+            var password = await userManager.CheckPasswordAsync(user,loginDTO.Password);
 
-        //}
+            if (!password)
+            {
+                return NotFound("email or password is incorrect");
+            }
+
+            var userRet = dbContext.Users.Include(o => o.orders).Include(c => c.CartItems).Include(w => w.Wishlists).FirstOrDefault(u => u.Id == user.Id);
+
+            UserDTO userDTO = new UserDTO
+            {
+                Id = userRet.Id,
+                UserName = userRet.UserName,
+                Email=userRet.Email,
+                Phone=userRet.PhoneNumber,
+                orders=userRet.orders,
+                cartItems=userRet.CartItems,
+                wishlists=userRet.Wishlists
+
+            };
+            return Ok(userDTO);
+        }
 
     }
 }
