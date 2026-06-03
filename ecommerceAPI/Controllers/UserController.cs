@@ -71,5 +71,25 @@ namespace ecommerceAPI.Controllers
             return Ok(userDTO);
         }
 
+
+        [HttpPost("Wishlist")]
+        public async Task<IActionResult> AddToWishlist(int PID, string UID)
+        {
+            //search for user by UID
+            var userRet = dbContext.Users.FirstOrDefault(u => u.Id == UID);
+            //Add to user's wishlist
+            if(userRet != null)
+            {
+                userRet.Wishlists.Add(new()
+                {
+                    ProductId = PID,
+                    UserId = UID
+                });
+                dbContext.SaveChanges();
+                return Ok(userRet);
+            }
+            return BadRequest("Failed to add to wishlist");
+        }
+
     }
 }
