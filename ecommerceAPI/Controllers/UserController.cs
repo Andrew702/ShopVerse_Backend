@@ -80,7 +80,7 @@ namespace ecommerceAPI.Controllers
             //Add to user's wishlist
             if(userRet != null)
             {
-                userRet.Wishlists.Add(new()
+                dbContext.Wishlists.Add(new()
                 {
                     ProductId = PID,
                     UserId = UID
@@ -90,6 +90,7 @@ namespace ecommerceAPI.Controllers
             }
             return BadRequest("Failed to add to wishlist");
         }
+
 
     }
 }

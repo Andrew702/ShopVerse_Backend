@@ -16,5 +16,7 @@ namespace ecommerceAPI.Models
 
         [JsonIgnore]
         public virtual User User { get; set; }
+
+        public virtual ICollection<orderItems> OrderItems { get; set; }
     }
 }
