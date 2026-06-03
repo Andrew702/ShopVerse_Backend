@@ -115,10 +115,44 @@ namespace ecommerceAPI.Controllers
         }
 
 
-        //[HttpPost("Order")]
-        //public async Task<IActionResult> MakeOrder(string UID)
-        //{
-        //}
+        [HttpPost("Order")]
+        public async Task<IActionResult> MakeOrder(string UID,string orderId)
+        {
+            var user = dbContext.Users.FirstOrDefault(u=>u.Id == UID);
+
+            if(user == null)
+            {
+                return NotFound("User not found");
+            }
+            var cart = dbContext.CartItems.Include(c => c.Product).Where(u=>u.UserId==UID).ToList();
+
+            decimal total = cart.Sum(item => item.Product.price * item.quantity);
+
+            var order = new Order
+            {
+                id=orderId,
+                UserId = UID,
+                total = total,
+                date = DateTime.Now
+            };
+
+            dbContext.CartItems.RemoveRange(cart);
+
+            foreach (var item in cart)
+            {
+                dbContext.OrderItems.Add(new()
+                {
+                    id = item.id,
+                    orderId = orderId,
+                    ProductId = item.ProductId,
+                    quantity = item.quantity
+                });
+            }
+            dbContext.Orders.Add(order);
+            dbContext.SaveChanges();
+            var orderRet = dbContext.Orders.Include(o=>o.OrderItems).FirstOrDefault(o=>o.id== orderId);
+            return Ok(orderRet);
+        }
 
 
 
