@@ -92,5 +92,35 @@ namespace ecommerceAPI.Controllers
         }
 
 
+
+        [HttpPost("Cart")]
+        public async Task<IActionResult> AddtoCart(string UID, int PID, int QTY, string CartID)
+        {
+            //search for user by UID
+            var userRet = dbContext.Users.FirstOrDefault(u => u.Id == UID);
+            //Add to user's wishlist
+            if (userRet != null)
+            {
+                dbContext.CartItems.Add(new()
+                {
+                    id = CartID,
+                    ProductId = PID,
+                    UserId = UID,
+                    quantity = QTY
+                });
+                dbContext.SaveChanges();
+                return Ok(userRet);
+            }
+            return BadRequest("Failed to add to cart");
+        }
+
+
+        //[HttpPost("Order")]
+        //public async Task<IActionResult> MakeOrder(string UID)
+        //{
+        //}
+
+
+
     }
 }
