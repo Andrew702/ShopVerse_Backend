@@ -14,6 +14,6 @@ namespace ecommerceAPI.DTO
 
         public ICollection<cartItems> cartItems { get; set; }
 
-        public ICollection<Wishlist> wishlists { get; set; }
+        public ICollection<Wishlist> wishlist { get; set; }
     }
 }

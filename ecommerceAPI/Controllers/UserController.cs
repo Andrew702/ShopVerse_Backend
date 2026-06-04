@@ -65,7 +65,7 @@ namespace ecommerceAPI.Controllers
                 Phone=userRet.PhoneNumber,
                 orders=userRet.orders,
                 cartItems=userRet.CartItems,
-                wishlists=userRet.Wishlists
+                wishlist=userRet.Wishlists
 
             };
             return Ok(userDTO);
@@ -76,9 +76,9 @@ namespace ecommerceAPI.Controllers
         public async Task<IActionResult> AddToWishlist(int PID, string UID)
         {
             //search for user by UID
-            var userRet = dbContext.Users.FirstOrDefault(u => u.Id == UID);
+            var userRet = dbContext.Users.Include(u=>u.orders).Include(u=>u.CartItems).Include(u=>u.Wishlists).FirstOrDefault(u => u.Id == UID);
             //Add to user's wishlist
-            if(userRet != null)
+            if (userRet != null)
             {
                 dbContext.Wishlists.Add(new()
                 {
@@ -89,6 +89,30 @@ namespace ecommerceAPI.Controllers
                 return Ok(userRet);
             }
             return BadRequest("Failed to add to wishlist");
+
+            //return Ok("Hello");
+        }
+
+
+        [HttpPost("RemoveWishlist")]
+        public async Task<IActionResult> RemoveFromWishlist(int PID, string UID)
+        {
+            //search for user by UID
+            var userRet = dbContext.Users.Include(u => u.orders).Include(u => u.CartItems).Include(u => u.Wishlists).FirstOrDefault(u => u.Id == UID);
+            //Add to user's wishlist
+            if (userRet != null)
+            {
+                var WishlistItem = dbContext.Wishlists.FirstOrDefault(w => w.UserId == UID && w.ProductId == PID);
+                if (WishlistItem == null)
+                    return BadRequest("Can't Find entry");
+
+                dbContext.Wishlists.Remove(WishlistItem);
+                dbContext.SaveChanges();
+                return Ok(userRet);
+            }
+            return BadRequest("Failed to remove from wishlist");
+
+            //return Ok("Hello");
         }
 
 
