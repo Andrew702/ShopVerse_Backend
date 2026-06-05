@@ -2,7 +2,7 @@
 
 namespace ecommerceAPI.DTO
 {
-    public class UserDTO
+    public class WishlistDTO
     {
         //            {
         //                "id": "1",
@@ -33,15 +33,17 @@ namespace ecommerceAPI.DTO
         //    ],
         //    "orders": []
         //}
-        public string Id { get; set; }
-        public string UserName { get; set; }
-        public string Email { get; set; }
+        public string id { get; set; }
+        public string name { get; set; }
+        public string email { get; set; }
 
-        public string Phone { get; set; }
+        public string phone { get; set; }
+
+        public string password { get; set; }
 
         public ICollection<Order> orders { get; set; }
 
-        public ICollection<cartItems> cartItems { get; set; }
+        public ICollection<cartItems> cart { get; set; }
 
         public ICollection<int> wishlist { get; set; }
     }

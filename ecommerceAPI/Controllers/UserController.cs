@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 
 namespace ecommerceAPI.Controllers
 {
@@ -65,7 +66,7 @@ namespace ecommerceAPI.Controllers
                 Phone=userRet.PhoneNumber,
                 orders=userRet.orders,
                 cartItems=userRet.CartItems,
-                wishlist=userRet.Wishlists
+                wishlist=userRet.Wishlists.Select(u=>u.ProductId).ToList()
 
             };
             return Ok(userDTO);
@@ -75,6 +76,8 @@ namespace ecommerceAPI.Controllers
         [HttpPost("Wishlist")]
         public async Task<IActionResult> AddToWishlist(int PID, string UID)
         {
+
+            
             //search for user by UID
             var userRet = dbContext.Users.Include(u=>u.orders).Include(u=>u.CartItems).Include(u=>u.Wishlists).FirstOrDefault(u => u.Id == UID);
             //Add to user's wishlist
@@ -86,7 +89,21 @@ namespace ecommerceAPI.Controllers
                     UserId = UID
                 });
                 dbContext.SaveChanges();
-                return Ok(userRet);
+
+                var wishlistDTO = new WishlistDTO
+                {
+                    id= userRet.Id,
+                    name=userRet.UserName,
+                    email=userRet.Email,
+                    phone=userRet.PhoneNumber,
+                    password="",
+                    wishlist=userRet.Wishlists.Select(u=>u.ProductId).ToList(),
+                    cart=userRet.CartItems,
+                    orders=userRet.orders,
+
+                };
+
+                return Ok(wishlistDTO);
             }
             return BadRequest("Failed to add to wishlist");
 
@@ -108,7 +125,19 @@ namespace ecommerceAPI.Controllers
 
                 dbContext.Wishlists.Remove(WishlistItem);
                 dbContext.SaveChanges();
-                return Ok(userRet);
+                var wishlistDTO = new WishlistDTO
+                {
+                    id = userRet.Id,
+                    name = userRet.UserName,
+                    email = userRet.Email,
+                    phone = userRet.PhoneNumber,
+                    password = "",
+                    wishlist = userRet.Wishlists.Select(u => u.ProductId).ToList(),
+                    cart = userRet.CartItems,
+                    orders = userRet.orders,
+
+                };
+                return Ok(wishlistDTO);
             }
             return BadRequest("Failed to remove from wishlist");
 
@@ -118,26 +147,101 @@ namespace ecommerceAPI.Controllers
 
 
         [HttpPost("Cart")]
-        public async Task<IActionResult> AddtoCart(string UID, int PID, int QTY, string CartID)
+        public async Task<IActionResult> CartUpdate(string UID, CartDTO cart)
         {
+
+      //      [{
+      //      id: item.id,
+      //  productId: item.productId,
+      //  quantity: item.quantity,
+      //  product: item.product,
+      //}
+      //      ;]
             //search for user by UID
             var userRet = dbContext.Users.FirstOrDefault(u => u.Id == UID);
-            //Add to user's wishlist
+
             if (userRet != null)
             {
-                dbContext.CartItems.Add(new()
+                var cartitems = dbContext.CartItems.Where(u=>u.UserId == UID).ToList();
+
+                dbContext.CartItems.RemoveRange(cartitems);
+
+                foreach (var item in cart.cartItems)
                 {
-                    id = CartID,
-                    ProductId = PID,
-                    UserId = UID,
-                    quantity = QTY
-                });
+                    dbContext.CartItems.Add(new()
+                    {
+                        id = item.id,
+                        ProductId=item.productId,
+                        UserId=UID,
+                        quantity = item.quantity
+
+                    });
+                }
+
                 dbContext.SaveChanges();
-                return Ok(userRet);
+                return Ok();
+
             }
-            return BadRequest("Failed to add to cart");
+            return BadRequest("Failed");
+
+
+
+
+            //Add to user's wishlist
+            //if (userRet != null)
+            //{
+            //    dbContext.CartItems.Add(new()
+            //    {
+            //        id = CartID,
+            //        ProductId = PID,
+            //        UserId = UID,
+            //        quantity = QTY
+            //    });
+            //    dbContext.SaveChanges();
+            //    var wishlistDTO = new WishlistDTO
+            //    {
+            //        id = userRet.Id,
+            //        name = userRet.UserName,
+            //        email = userRet.Email,
+            //        phone = userRet.PhoneNumber,
+            //        password = "",
+            //        wishlist = userRet.Wishlists.Select(u => u.ProductId).ToList(),
+            //        cart = userRet.CartItems,
+            //        orders = userRet.orders,
+
+            //    };
+            //    return Ok(wishlistDTO);
+            //}
+            //return BadRequest("Failed to add to cart");
         }
 
+
+        [HttpGet("cart")]
+
+        public IActionResult GetCart(string userId)
+        {
+            var userRet = dbContext.Users.Include(u => u.orders).Include(u => u.CartItems).Include(u => u.Wishlists).FirstOrDefault(u => u.Id == userId);
+
+
+            if (userRet != null)
+            {
+                var wishlistDTO = new WishlistDTO
+                {
+                    id = userRet.Id,
+                    name = userRet.UserName,
+                    email = userRet.Email,
+                    phone = userRet.PhoneNumber,
+                    password = "",
+                    wishlist = userRet.Wishlists.Select(u => u.ProductId).ToList(),
+                    cart = userRet.CartItems,
+                    orders = userRet.orders,
+
+                };
+                return Ok(wishlistDTO);
+            }
+
+            return BadRequest("Failed");
+        }
 
         [HttpPost("Order")]
         public async Task<IActionResult> MakeOrder(string UID,string orderId)
