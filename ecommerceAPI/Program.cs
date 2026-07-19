@@ -1,58 +1,106 @@
-
-using ecommerceAPI.Data;
-using ecommerceAPI.Models;
+using System.Text;
+using ecommerceAPI.BLL.Extensions;
+using ecommerceAPI.BLL.Interfaces;
+using ecommerceAPI.BLL.Services;
+using ecommerceAPI.DAL.Data;
+using ecommerceAPI.DAL.Entities;
+using ecommerceAPI.DAL.Interfaces;
+using ecommerceAPI.DAL.Seeding;
+using ecommerceAPI.DAL.UnitOfWork;
+using ecommerceAPI.Middleware;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
-namespace ecommerceAPI
+var builder = WebApplication.CreateBuilder(args);
+
+// ===== Database =====
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("cs")));
+
+builder.Services.AddIdentity<User, IdentityRole>(options =>
 {
-    public class Program
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 6;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireLowercase = true;
+})
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
+
+// ===== JWT Authentication =====
+var jwtSettings = builder.Configuration.GetSection("Jwt");
+var jwtKey = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(jwtKey)
+    };
+});
 
-            // Add services to the container.
+builder.Services.AddAuthorization();
 
-            builder.Services.AddControllers();
-            builder.Services.AddDbContext<AppDbContext>(options =>
-             options.UseSqlServer(builder.Configuration.GetConnectionString("cs")));
+// ===== DAL Layer =====
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+// ===== BLL Layer =====
+builder.Services.AddBLLServices(builder.Configuration);
 
-            builder.Services.AddIdentity<User, IdentityRole>()
-                .AddEntityFrameworkStores<AppDbContext>();
+// ===== API Layer =====
+builder.Services.AddControllers();
+builder.Services.AddOpenApi();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MyPolicy", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("MyPolicy", policy => {
-                    policy.AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader();
+var app = builder.Build();
 
-                });
-            });
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            builder.Services.AddOpenApi();
+// ===== Middleware Pipeline =====
+app.UseMiddleware<ExceptionMiddleware>();
 
-            var app = builder.Build();
-
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.MapOpenApi();
-                app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "v1"));
-            }
-
-            app.UseHttpsRedirection();
-            app.UseCors("MyPolicy");
-
-            app.UseAuthorization();
-
-
-            app.MapControllers();
-
-            app.Run();
-        }
-    }
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "v1"));
 }
+
+app.UseHttpsRedirection();
+app.UseCors("MyPolicy");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+// ===== Seed Database =====
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    await DatabaseSeeder.SeedAsync(context, userManager, roleManager);
+}
+
+app.Run();
