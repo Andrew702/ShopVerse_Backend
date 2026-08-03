@@ -33,7 +33,7 @@ public class MappingProfile : Profile
         CreateMap<CartItem, CartItemResponse>()
             .ForMember(d => d.ProductTitle, o => o.MapFrom(s => s.Product.Title))
             .ForMember(d => d.ProductImage, o => o.MapFrom(s => s.Product.Image))
-            .ForMember(d => d.UnitPrice, o => o.MapFrom(s => s.Product.Price));
+            .ForMember(d => d.UnitPrice, o => o.MapFrom(s => s.Product.DiscountedPrice));
 
         // Order → OrderResponse
         CreateMap<Order, OrderResponse>()

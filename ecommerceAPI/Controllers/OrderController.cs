@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ecommerceAPI.BLL.DTOs.Request;
 using ecommerceAPI.BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -36,9 +37,15 @@ public class OrderController : ControllerBase
     [HttpGet("{orderId:int}")]
     public async Task<IActionResult> GetOrderById(int orderId)
     {
-        var order = await _orderService.GetOrderByIdAsync(orderId);
-        if (order == null)
-            return NotFound(new { message = "Order not found." });
+        var order = await _orderService.GetOrderByIdAsync(orderId, UserId);
+        return Ok(order);
+    }
+
+    [HttpPut("{orderId:int}/status")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateOrderStatus(int orderId, [FromBody] UpdateOrderStatusRequest request)
+    {
+        var order = await _orderService.UpdateOrderStatusAsync(orderId, request.Status);
         return Ok(order);
     }
 }

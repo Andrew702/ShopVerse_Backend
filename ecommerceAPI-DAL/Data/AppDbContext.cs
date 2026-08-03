@@ -16,6 +16,7 @@ public class AppDbContext : IdentityDbContext<User>
         builder.Entity<Product>(entity =>
         {
             entity.Property(p => p.Price).HasColumnType("decimal(18,2)");
+            entity.Property(p => p.DiscountPercentage).HasColumnType("decimal(5,2)");
             entity.Property(p => p.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             entity.HasOne(p => p.Category)
@@ -73,6 +74,8 @@ public class AppDbContext : IdentityDbContext<User>
         // ---- CartItem ----
         builder.Entity<CartItem>(entity =>
         {
+            entity.HasIndex(ci => new { ci.UserId, ci.ProductId }).IsUnique();
+
             entity.HasOne(ci => ci.User)
                   .WithMany(u => u.CartItems)
                   .HasForeignKey(ci => ci.UserId)

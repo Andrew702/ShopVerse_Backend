@@ -86,3 +86,4 @@ UpgradeLog*.htm
 
 # appsettings
 appsettings.json
+plans/

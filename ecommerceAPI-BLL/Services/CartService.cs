@@ -40,11 +40,24 @@ public class CartService : ICartService
 
         if (existingItem != null)
         {
+            if (existingItem.Quantity + request.Quantity > product.StockQuantity)
+                throw new BadRequestException(
+                    $"Insufficient stock for \"{product.Title}\" (available: {product.StockQuantity}).");
+
             existingItem.Quantity += request.Quantity;
             _unitOfWork.CartItems.Update(existingItem);
             await _unitOfWork.CompleteAsync();
-            return _mapper.Map<CartItemResponse>(existingItem);
+
+            var savedItem = await _unitOfWork.CartItems.GetQueryable()
+                .Include(ci => ci.Product)
+                .FirstOrDefaultAsync(ci => ci.Id == existingItem.Id);
+
+            return _mapper.Map<CartItemResponse>(savedItem!);
         }
+
+        if (request.Quantity > product.StockQuantity)
+            throw new BadRequestException(
+                $"Insufficient stock for \"{product.Title}\" (available: {product.StockQuantity}).");
 
         var cartItem = new CartItem
         {
@@ -57,11 +70,11 @@ public class CartService : ICartService
         await _unitOfWork.CompleteAsync();
 
         // Reload with product for response mapping
-        var savedItem = await _unitOfWork.CartItems.GetQueryable()
+        var saved = await _unitOfWork.CartItems.GetQueryable()
             .Include(ci => ci.Product)
             .FirstOrDefaultAsync(ci => ci.Id == cartItem.Id);
 
-        return _mapper.Map<CartItemResponse>(savedItem!);
+        return _mapper.Map<CartItemResponse>(saved!);
     }
 
     public async Task UpdateQuantityAsync(int cartItemId, string userId, UpdateCartItemRequest request)
@@ -69,6 +82,13 @@ public class CartService : ICartService
         var cartItem = await _unitOfWork.CartItems
             .FirstOrDefaultAsync(ci => ci.Id == cartItemId && ci.UserId == userId)
             ?? throw new NotFoundException($"Cart item with ID {cartItemId} not found.");
+
+        var product = await _unitOfWork.Products.GetByIdAsync(cartItem.ProductId)
+            ?? throw new NotFoundException($"Product with ID {cartItem.ProductId} not found.");
+
+        if (request.Quantity > product.StockQuantity)
+            throw new BadRequestException(
+                $"Insufficient stock for \"{product.Title}\" (available: {product.StockQuantity}).");
 
         cartItem.Quantity = request.Quantity;
         _unitOfWork.CartItems.Update(cartItem);

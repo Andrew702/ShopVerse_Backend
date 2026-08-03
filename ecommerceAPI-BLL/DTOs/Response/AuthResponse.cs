@@ -9,5 +9,4 @@ public class AuthResponse
     public DateTime ExpiresAt { get; set; }
     public List<int> Wishlist { get; set; } = new();
     public List<CartItemResponse> CartItems { get; set; } = new();
-    public List<OrderResponse> Orders { get; set; } = new();
 }

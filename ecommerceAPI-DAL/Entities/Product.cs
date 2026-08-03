@@ -7,6 +7,12 @@ public class Product
     public string Description { get; set; } = string.Empty;
     public decimal Price { get; set; }
     public string Image { get; set; } = string.Empty;
+    public decimal? DiscountPercentage { get; set; }   // e.g. 10.00 = 10% off, null = no discount
+    public bool IsOnSale { get; set; } = false;         // true when actively discounted
+    public int StockQuantity { get; set; } = 0;         // units in stock
+    public decimal DiscountedPrice => DiscountPercentage is > 0
+        ? Math.Round(Price * (1 - DiscountPercentage.Value / 100m), 2)
+        : Price;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 

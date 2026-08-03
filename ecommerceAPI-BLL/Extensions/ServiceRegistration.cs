@@ -14,7 +14,7 @@ public static class ServiceRegistration
     public static IServiceCollection AddBLLServices(this IServiceCollection services, IConfiguration configuration)
     {
         // AutoMapper
-        services.AddAutoMapper(typeof(MappingProfile));
+        services.AddAutoMapper(cfg => cfg.AddProfile<MappingProfile>());
 
         // FluentValidation
         services.AddFluentValidationAutoValidation();

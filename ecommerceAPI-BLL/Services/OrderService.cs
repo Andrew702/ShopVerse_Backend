@@ -30,36 +30,48 @@ public class OrderService : IOrderService
         if (!cartItems.Any())
             throw new BadRequestException("Cart is empty. Add items before creating an order.");
 
-        var order = new Order
+        await _unitOfWork.BeginTransactionAsync();
+        try
         {
-            UserId = userId,
-            Total = cartItems.Sum(ci => ci.Product.Price * ci.Quantity),
-            Date = DateTime.UtcNow,
-            Status = OrderStatus.Pending
-        };
-
-        await _unitOfWork.Orders.AddAsync(order);
-        await _unitOfWork.CompleteAsync();
-
-        foreach (var cartItem in cartItems)
-        {
-            await _unitOfWork.OrderItems.AddAsync(new OrderItem
+            var orderItems = new List<OrderItem>();
+            foreach (var cartItem in cartItems)
             {
-                OrderId = order.Id,
-                ProductId = cartItem.ProductId,
-                Quantity = cartItem.Quantity,
-                UnitPrice = cartItem.Product.Price
-            });
+                if (cartItem.Quantity > cartItem.Product.StockQuantity)
+                    throw new BadRequestException(
+                        $"Insufficient stock for \"{cartItem.Product.Title}\" (available: {cartItem.Product.StockQuantity}).");
+
+                cartItem.Product.StockQuantity -= cartItem.Quantity;
+
+                orderItems.Add(new OrderItem
+                {
+                    ProductId = cartItem.ProductId,
+                    Quantity = cartItem.Quantity,
+                    UnitPrice = cartItem.Product.DiscountedPrice
+                });
+            }
+
+            var order = new Order
+            {
+                UserId = userId,
+                Total = orderItems.Sum(oi => oi.UnitPrice * oi.Quantity),
+                Date = DateTime.UtcNow,
+                Status = OrderStatus.Pending,
+                OrderItems = orderItems
+            };
+
+            await _unitOfWork.Orders.AddAsync(order);
+            _unitOfWork.CartItems.DeleteRange(cartItems);
+            await _unitOfWork.CompleteAsync();
+
+            await _unitOfWork.CommitTransactionAsync();
+
+            return _mapper.Map<OrderResponse>(order);
         }
-
-        _unitOfWork.CartItems.DeleteRange(cartItems);
-        await _unitOfWork.CompleteAsync();
-
-        var fullOrder = await _unitOfWork.Orders.GetQueryable()
-            .Include(o => o.OrderItems).ThenInclude(oi => oi.Product)
-            .FirstOrDefaultAsync(o => o.Id == order.Id);
-
-        return _mapper.Map<OrderResponse>(fullOrder!);
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
     }
 
     public async Task<IEnumerable<OrderResponse>> GetUserOrdersAsync(string userId)
@@ -73,13 +85,14 @@ public class OrderService : IOrderService
         return _mapper.Map<IEnumerable<OrderResponse>>(orders);
     }
 
-    public async Task<OrderResponse?> GetOrderByIdAsync(int orderId)
+    public async Task<OrderResponse> GetOrderByIdAsync(int orderId, string userId)
     {
         var order = await _unitOfWork.Orders.GetQueryable()
             .Include(o => o.OrderItems).ThenInclude(oi => oi.Product)
-            .FirstOrDefaultAsync(o => o.Id == orderId);
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId)
+            ?? throw new NotFoundException("Order not found.");
 
-        return order == null ? null : _mapper.Map<OrderResponse>(order);
+        return _mapper.Map<OrderResponse>(order);
     }
 
     public async Task<OrderResponse> UpdateOrderStatusAsync(int orderId, string newStatus)

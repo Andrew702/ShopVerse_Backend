@@ -5,8 +5,6 @@
     <RootNamespace>ecommerceAPI.DAL</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>NU1903</NoWarn>
-    <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
 
   <ItemGroup>

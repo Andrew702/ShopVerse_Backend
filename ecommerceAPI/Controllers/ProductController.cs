@@ -1,4 +1,7 @@
+using System.Security.Claims;
+using ecommerceAPI.BLL.DTOs.Request;
 using ecommerceAPI.BLL.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ecommerceAPI.Controllers;
@@ -20,9 +23,17 @@ public class ProductController : ControllerBase
         [FromQuery] int pageSize = 12,
         [FromQuery] string? search = null,
         [FromQuery] int? categoryId = null,
-        [FromQuery] int? brandId = null)
+        [FromQuery] int? brandId = null,
+        [FromQuery] decimal? minPrice = null,
+        [FromQuery] decimal? maxPrice = null,
+        [FromQuery] double? minRating = null,
+        [FromQuery] bool? onSale = null,
+        [FromQuery] bool? inStock = null,
+        [FromQuery] string? sortBy = null)
     {
-        var result = await _productService.GetAllAsync(page, pageSize, search, categoryId, brandId);
+        var result = await _productService.GetAllAsync(
+            page, pageSize, search, categoryId, brandId,
+            minPrice, maxPrice, minRating, onSale, inStock, sortBy);
         return Ok(result);
     }
 
@@ -30,9 +41,16 @@ public class ProductController : ControllerBase
     public async Task<IActionResult> GetById(int id)
     {
         var product = await _productService.GetByIdAsync(id);
-        if (product == null)
-            return NotFound(new { message = $"Product with ID {id} not found." });
         return Ok(product);
+    }
+
+    [HttpPost("{id:int}/reviews")]
+    [Authorize]
+    public async Task<IActionResult> AddReview(int id, [FromBody] CreateReviewRequest request)
+    {
+        var reviewerName = User.FindFirstValue(ClaimTypes.Name) ?? "Anonymous";
+        var review = await _productService.AddReviewAsync(id, reviewerName, request);
+        return Ok(review);
     }
 
     [HttpGet("category/{categoryId:int}")]

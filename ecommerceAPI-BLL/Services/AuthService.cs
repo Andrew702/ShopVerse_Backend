@@ -45,7 +45,13 @@ public class AuthService : IAuthService
             throw new BadRequestException(errors);
         }
 
-        await _userManager.AddToRoleAsync(user, "Customer");
+        var roleResult = await _userManager.AddToRoleAsync(user, "Customer");
+        if (!roleResult.Succeeded)
+        {
+            var errors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
+            throw new BadRequestException($"Failed to assign Customer role: {errors}");
+        }
+
         return await GenerateAuthResponseAsync(user);
     }
 
@@ -60,12 +66,13 @@ public class AuthService : IAuthService
 
     private async Task<AuthResponse> GenerateAuthResponseAsync(User user)
     {
-        var token = GenerateJwtToken(user);
+        var durationHours = double.Parse(_configuration["Jwt:DurationInHours"] ?? "24");
+        var expiresAt = DateTime.UtcNow.AddHours(durationHours);
+        var token = await GenerateJwtTokenAsync(user, expiresAt);
 
         var userWithIncludes = await _unitOfWork.Users.GetQueryable()
             .Include(u => u.CartItems).ThenInclude(ci => ci.Product)
             .Include(u => u.Wishlists).ThenInclude(w => w.Product)
-            .Include(u => u.Orders).ThenInclude(o => o.OrderItems).ThenInclude(oi => oi.Product)
             .FirstOrDefaultAsync(u => u.Id == user.Id);
 
         var response = new AuthResponse
@@ -74,7 +81,7 @@ public class AuthService : IAuthService
             UserName = user.UserName ?? string.Empty,
             Email = user.Email ?? string.Empty,
             Token = token,
-            ExpiresAt = DateTime.UtcNow.AddHours(24)
+            ExpiresAt = expiresAt
         };
 
         if (userWithIncludes?.CartItems != null)
@@ -83,13 +90,10 @@ public class AuthService : IAuthService
         if (userWithIncludes?.Wishlists != null)
             response.Wishlist = userWithIncludes.Wishlists.Select(w => w.ProductId).ToList();
 
-        if (userWithIncludes?.Orders != null)
-            response.Orders = _mapper.Map<List<OrderResponse>>(userWithIncludes.Orders);
-
         return response;
     }
 
-    private string GenerateJwtToken(User user)
+    private async Task<string> GenerateJwtTokenAsync(User user, DateTime expiresAt)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
@@ -102,11 +106,14 @@ public class AuthService : IAuthService
             new(ClaimTypes.Email, user.Email ?? string.Empty)
         };
 
+        var roles = await _userManager.GetRolesAsync(user);
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
         var token = new JwtSecurityToken(
             issuer: jwtSettings["Issuer"],
             audience: jwtSettings["Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(24),
+            expires: expiresAt,
             signingCredentials: creds
         );
 
